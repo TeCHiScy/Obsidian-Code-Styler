@@ -166,7 +166,7 @@ async function updateCache(cache: Cache, plugin: CodeStylerPlugin): Promise<void
 	await plugin.app.vault.adapter.write(plugin.app.vault.configDir + EXTERNAL_REFERENCE_CACHE, JSON.stringify(cache));
 }
 function idExternalReference(fileLink: string): {id: string, website: string} {
-	const linkInfo = /^https?:\/\/(.+)\.com\/(.+)$/.exec(fileLink);
+	const linkInfo = /^https?:\/\/(.+)\/(.+)$/.exec(fileLink);
 	if (!linkInfo?.[1] || !linkInfo?.[2])
 		throw Error("No such repository could be found");
 	return {id: [linkInfo[1], ...linkInfo[2].split("/")].join("-"), website: linkInfo[1]};
