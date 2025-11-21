@@ -766,11 +766,10 @@ export const SPECIAL_LANGUAGES = [
 	"^run-.+$",
 ];
 export const SETTINGS_SOURCEPATH_PREFIX = "@Code-Styler-Settings:";
-export const LOCAL_PREFIX = "@/";
-export const REFERENCE_CODEBLOCK = "reference";
-export const EXTERNAL_REFERENCE_PATH = "/plugins/code-styler/reference-files/";
-export const EXTERNAL_REFERENCE_CACHE = EXTERNAL_REFERENCE_PATH + "cache.json";
-export const EXTERNAL_REFERENCE_INFO_SUFFIX = "-info.json";
+export const REF_CODEBLOCK = "reference";
+export const EXT_REF_PATH = "plugins/code-styler/reference-files/";
+export const EXT_REF_CACHE = EXT_REF_PATH + "cache.json";
+export const EXT_REF_METADATA_SUFFIX = "-metadata.json";
 export const GIT_ICONS: { [key: string]: string } = {
 	branch: "&#xe0a0;",
 	tree: "&#xeafc;", // commit
@@ -784,6 +783,14 @@ export const SITE_ICONS: { [key: string]: string } = {
 };
 export const STAMP_ICON = "&#xf00f0;";
 export const UPDATE_ICON = "&#xe348;";
+
+export function extRefContentPath(id: string): string {
+	return EXT_REF_PATH + id;
+}
+
+export function extRefMetadataPath(id: string): string {
+	return EXT_REF_PATH + id + EXT_REF_METADATA_SUFFIX;
+}
 
 const PRISM_LANGUAGES: { [key: string]: string } = {
 	// Prism Languages: https://prismjs.com/plugins/show-language/
@@ -1062,6 +1069,7 @@ const PRISM_LANGUAGES: { [key: string]: string } = {
 	yml: "YAML",
 	yang: "YANG",
 };
+
 const MANUAL_PRISM_LANGUAGES: { [key: string]: string } = {
 	// Manually generated list from https://prismjs.com/  -  297 languages
 	css: "CSS",
@@ -1450,6 +1458,7 @@ const MANUAL_PRISM_LANGUAGES: { [key: string]: string } = {
 	yang: "YANG",
 	zig: "Zig",
 };
+
 const MANUAL_LANGUAGES: { [key: string]: string } = {
 	// Manually created list
 	fish: "Fish",
@@ -1462,6 +1471,7 @@ const MANUAL_LANGUAGES: { [key: string]: string } = {
 	sqlite: "SQL",
 	zsh: "Zsh",
 };
+
 export const LANGUAGE_NAMES: { [key: string]: string } = {
 	...PRISM_LANGUAGES,
 	...MANUAL_PRISM_LANGUAGES,

@@ -11,175 +11,158 @@ import { CodeblockParameters, Highlights } from "./Parsing/CodeblockParsing";
 import { InlineCodeParameters } from "./Parsing/InlineCodeParsing";
 import { MarkdownRenderer, MarkdownView } from "obsidian";
 import CodeStylerPlugin from "./main";
-import { updateExternalReference } from "./Referencing";
-import { Reference } from "./Parsing/ReferenceParsing";
 import { rerender } from "./EditingView";
+import { updateExtRef } from "./Referencing";
 
 export function createHeader(
-	codeblockParameters: CodeblockParameters,
+	params: CodeblockParameters,
 	themeSettings: CodeStylerThemeSettings,
 	sourcePath: string,
 	plugin: CodeStylerPlugin
 ): HTMLElement {
 	const headerContainer = createDiv();
-	const iconURL = codeblockParameters.language
-		? getLanguageIcon(codeblockParameters.language, plugin.languageIcons)
+	const iconURL = params.language
+		? getLanguageIcon(params.language, plugin.languageIcons)
 		: undefined;
-	if (!isHeaderHidden(codeblockParameters, themeSettings, iconURL)) {
+	if (!isHeaderHidden(params, themeSettings, iconURL)) {
 		headerContainer.classList.add("code-styler-header-container");
-		if (codeblockParameters.language !== "") {
-			if (
-				isLanguageIconShown(codeblockParameters, themeSettings, iconURL)
-			)
+		if (params.language !== "") {
+			if (isLanguageIconShown(params, themeSettings, iconURL)) {
 				headerContainer.appendChild(
 					createImageWrapper(iconURL as string, createDiv())
 				);
-			if (isLanguageTagShown(codeblockParameters, themeSettings))
+			}
+			if (isLanguageTagShown(params, themeSettings)) {
 				headerContainer.appendChild(
 					createDiv({
 						cls: "code-styler-header-language-tag",
-						text: getLanguageTag(codeblockParameters.language),
+						text: getLanguageTag(params.language),
 					})
 				);
+			}
 		}
 		headerContainer.appendChild(
-			createTitleContainer(
-				codeblockParameters,
-				themeSettings,
-				sourcePath,
-				plugin
-			)
+			createTitleContainer(params, themeSettings, sourcePath, plugin)
 		);
-		if (codeblockParameters?.externalReference)
+		if (params?.externalReference) {
 			headerContainer.appendChild(
-				createExternalReferenceContainer(
-					codeblockParameters,
-					sourcePath,
-					plugin
-				)
+				createExtRefContainer(params, sourcePath, plugin)
 			);
-		if (false)
+		}
+		if (false) {
 			//TODO (@mayurankv) Add settings toggle once execute code compatibility improved
 			headerContainer.appendChild(
-				createExecuteCodeContainer(codeblockParameters, plugin)
+				createExecuteCodeContainer(params, plugin)
 			);
-	} else headerContainer.classList.add("code-styler-header-container-hidden");
+		}
+	} else {
+		headerContainer.classList.add("code-styler-header-container-hidden");
+	}
 	return headerContainer;
 }
 
 function createTitleContainer(
-	codeblockParameters: CodeblockParameters,
-	themeSettings: CodeStylerThemeSettings,
+	params: CodeblockParameters,
+	settings: CodeStylerThemeSettings,
 	sourcePath: string,
 	plugin: CodeStylerPlugin
 ): HTMLElement {
 	const titleContainer = createDiv({ cls: "code-styler-header-text" });
 	const title =
-		codeblockParameters.title ||
-		(codeblockParameters.fold.enabled
-			? codeblockParameters.fold.placeholder ||
-			  themeSettings.header.foldPlaceholder ||
+		params.title ||
+		(params.fold.enabled
+			? params.fold.placeholder ||
+			  settings.header.foldPlaceholder ||
 			  FOLD_PLACEHOLDER
 			: "");
-	if (codeblockParameters.reference === "") titleContainer.innerText = title;
-	else if (/^(?:https?|file|zotero):\/\//.test(codeblockParameters.reference))
+	if (params.reference === "") {
+		titleContainer.innerText = title;
+	} else if (/^(?:https?|file|zotero):\/\//.test(params.reference))
 		MarkdownRenderer.render(
 			plugin.app,
-			`[${title}](${codeblockParameters.reference})`,
+			`[${title}](${params.reference})`,
 			titleContainer,
 			sourcePath,
 			plugin
 		);
-	else
+	else {
 		MarkdownRenderer.render(
 			plugin.app,
-			`[[${codeblockParameters.reference}|${title}]]`,
+			`[[${params.reference}|${title}]]`,
 			titleContainer,
 			sourcePath,
 			plugin
 		); //TODO (@mayurankv) Add links to metadata cache properly
+	}
 	return titleContainer;
 }
 
-function createExternalReferenceContainer(
-	codeblockParameters: CodeblockParameters,
+function createExtRefContainer(
+	params: CodeblockParameters,
 	sourcePath: string,
 	plugin: CodeStylerPlugin
 ): HTMLElement {
 	//TODO (@mayurankv) Add theme settings to conditionally set sections
-	const externalReferenceContainer = createDiv({
+
+	const container = createDiv({
 		cls: "code-styler-header-external-reference",
 	});
-	if (
-		plugin.settings.currentTheme.settings.header.externalReference
-			.displayRepository
-	) {
-		const siteIcon = createDiv({ cls: "external-reference-repo-icon" });
-		siteIcon.innerHTML =
-			SITE_ICONS?.[
-				codeblockParameters?.externalReference?.external?.info
-					?.site as string
-			] ?? SITE_ICONS["generic"];
-		externalReferenceContainer.appendChild(siteIcon);
-		externalReferenceContainer.appendChild(
+
+	const settings = plugin.settings.currentTheme.settings;
+	const metadata = params?.externalReference?.metadata;
+
+	if (settings.header.externalReference.displayRepository) {
+		const icon = createDiv({ cls: "external-reference-repo-icon" });
+		icon.innerHTML =
+			SITE_ICONS?.[metadata?.site as string] ?? SITE_ICONS["generic"];
+		container.appendChild(icon);
+		container.appendChild(
 			createDiv({
 				cls: "external-reference-repo",
-				text:
-					codeblockParameters?.externalReference?.external?.info
-						?.author +
-					"/" +
-					codeblockParameters?.externalReference?.external?.info
-						?.repository,
+				text: metadata?.author + "/" + metadata?.repository,
 			})
 		);
 	}
-	if (
-		plugin.settings.currentTheme.settings.header.externalReference
-			.displayVersion
-	) {
-		const refIcon = createDiv({ cls: "external-reference-ref-icon" });
-		refIcon.innerHTML =
-			GIT_ICONS?.[
-				codeblockParameters?.externalReference?.external?.info?.refInfo
-					?.type as string
-			] ?? GIT_ICONS["branch"];
-		externalReferenceContainer.appendChild(refIcon);
-		externalReferenceContainer.appendChild(
+
+	if (settings.header.externalReference.displayVersion) {
+		const icon = createDiv({ cls: "external-reference-ref-icon" });
+		icon.innerHTML =
+			GIT_ICONS?.[metadata?.refInfo?.type as string] ??
+			GIT_ICONS["branch"];
+		container.appendChild(icon);
+		container.appendChild(
 			createDiv({
 				cls: "external-reference-ref",
-				text: codeblockParameters?.externalReference?.external?.info
-					?.refInfo?.ref as string,
+				text: metadata?.refInfo?.ref as string,
 			})
 		);
 	}
-	if (
-		plugin.settings.currentTheme.settings.header.externalReference
-			.displayTimestamp
-	) {
-		const stampIcon = createDiv({
+
+	if (settings.header.externalReference.displayTimestamp) {
+		const icon = createDiv({
 			cls: "external-reference-timestamp-icon",
 		});
-		stampIcon.innerHTML = STAMP_ICON;
-		externalReferenceContainer.appendChild(stampIcon);
-		externalReferenceContainer.appendChild(
+		icon.innerHTML = STAMP_ICON;
+		container.appendChild(icon);
+		container.appendChild(
 			createDiv({
 				cls: "external-reference-timestamp",
-				text: codeblockParameters?.externalReference?.external?.info
-					?.datetime as string,
+				text: metadata?.datetime as string,
 			})
 		);
 	}
+
 	const updateIcon = createEl("button", {
 		cls: "external-reference-update-icon",
 	});
 	updateIcon.innerHTML = UPDATE_ICON;
 	updateIcon.title = "Update Reference";
 	updateIcon.addEventListener("click", async (event) => {
+		if (!params?.externalReference) {
+			return;
+		}
 		event.stopImmediatePropagation();
-		await updateExternalReference(
-			codeblockParameters?.externalReference as Reference,
-			plugin
-		);
+		await updateExtRef(params?.externalReference.params, plugin);
 		const codeblockElement = (
 			event.target as HTMLElement
 		).parentElement?.parentElement?.parentElement?.querySelector("code");
@@ -217,37 +200,30 @@ function createExternalReferenceContainer(
 			);
 		}
 	});
-	externalReferenceContainer.appendChild(updateIcon);
-	return externalReferenceContainer;
+	container.appendChild(updateIcon);
+	return container;
 }
 
 function createExecuteCodeContainer(
-	codeblockParameters: CodeblockParameters,
+	params: CodeblockParameters,
 	plugin: CodeStylerPlugin
 ): HTMLElement {
-	const executeCodeContainer = createDiv({
+	const container = createDiv({
 		cls: "code-styler-header-execute-code",
 	});
-	console.log(
-		"Developer Error: Section not finished",
-		codeblockParameters,
-		plugin
-	);
+	console.log("Developer Error: Section not finished", params, plugin);
 	//TODO (@mayurankv) Finish
-	return executeCodeContainer;
+	return container;
 }
 
 export function createInlineOpener(
-	inlineCodeParameters: InlineCodeParameters,
+	params: InlineCodeParameters,
 	languageIcons: Record<string, string>,
 	containerClasses: string[] = ["code-styler-inline-opener"]
 ): HTMLElement {
 	const openerContainer = createSpan({ cls: containerClasses.join(" ") });
-	if (inlineCodeParameters.icon) {
-		const iconURL = getLanguageIcon(
-			inlineCodeParameters.language,
-			languageIcons
-		);
+	if (params.icon) {
+		const iconURL = getLanguageIcon(params.language, languageIcons);
 		if (typeof iconURL !== "undefined")
 			openerContainer.appendChild(
 				createImageWrapper(
@@ -257,11 +233,11 @@ export function createInlineOpener(
 				)
 			);
 	}
-	if (inlineCodeParameters.title)
+	if (params.title)
 		openerContainer.appendChild(
 			createSpan({
 				cls: "code-styler-inline-title",
-				text: inlineCodeParameters.title,
+				text: params.title,
 			})
 		);
 	return openerContainer;
@@ -294,71 +270,71 @@ function getLanguageTag(language: string) {
 }
 
 export function isHeaderHidden(
-	codeblockParameters: CodeblockParameters,
-	themeSettings: CodeStylerThemeSettings,
+	params: CodeblockParameters,
+	settings: CodeStylerThemeSettings,
 	iconURL: string | undefined
 ): boolean {
 	return (
-		!isHeaderRequired(codeblockParameters) &&
-		(codeblockParameters.language === "" ||
-			(themeSettings.header.languageTag.display !== "always" &&
-				(themeSettings.header.languageIcon.display !== "always" ||
+		!isHeaderRequired(params) &&
+		(params.language === "" ||
+			(settings.header.languageTag.display !== "always" &&
+				(settings.header.languageIcon.display !== "always" ||
 					typeof iconURL == "undefined")))
 	);
 }
 
 function isLanguageIconShown(
-	codeblockParameters: CodeblockParameters,
+	params: CodeblockParameters,
 	themeSettings: CodeStylerThemeSettings,
 	iconURL: string | undefined
 ): boolean {
 	return (
 		typeof iconURL !== "undefined" &&
 		(themeSettings.header.languageIcon.display === "always" ||
-			(isHeaderRequired(codeblockParameters) &&
+			(isHeaderRequired(params) &&
 				themeSettings.header.languageIcon.display ===
 					"if_header_shown"))
 	);
 }
 
 function isLanguageTagShown(
-	codeblockParameters: CodeblockParameters,
-	themeSettings: CodeStylerThemeSettings
+	params: CodeblockParameters,
+	settings: CodeStylerThemeSettings
 ): boolean {
 	return (
-		themeSettings.header.languageTag.display === "always" ||
-		(isHeaderRequired(codeblockParameters) &&
-			themeSettings.header.languageTag.display === "if_header_shown")
+		settings.header.languageTag.display === "always" ||
+		(isHeaderRequired(params) &&
+			settings.header.languageTag.display === "if_header_shown")
 	);
 }
 
-function isHeaderRequired(codeblockParameters: CodeblockParameters): boolean {
-	return codeblockParameters.fold.enabled || codeblockParameters.title !== "";
+function isHeaderRequired(params: CodeblockParameters): boolean {
+	return params.fold.enabled || params.title !== "";
 }
 
 export function getLineClass(
-	codeblockParameters: CodeblockParameters,
+	params: CodeblockParameters,
 	lineNumber: number,
 	line: string
 ): string[] {
 	let classList: string[] = [];
 	if (
-		codeblockParameters.highlights.default.lineNumbers.includes(
-			lineNumber + codeblockParameters.lineNumbers.offset
+		params.highlights.default.lineNumbers.includes(
+			lineNumber + params.lineNumbers.offset
 		) ||
-		codeblockParameters.highlights.default.plainText.some(
+		params.highlights.default.plainText.some(
 			(text) => line.indexOf(text) > -1
 		) ||
-		codeblockParameters.highlights.default.regularExpressions.some(
-			(regExp) => regExp.test(line)
+		params.highlights.default.regularExpressions.some((regExp) =>
+			regExp.test(line)
 		)
 	)
 		classList.push("code-styler-line-highlighted");
-	Object.entries(codeblockParameters.highlights.alternative).forEach(
+	Object.entries(params.highlights.alternative).forEach(
 		([alternativeHighlight, highlightedLines]: [string, Highlights]) => {
 			if (
 				highlightedLines.lineNumbers.includes(
-					lineNumber + codeblockParameters.lineNumbers.offset
+					lineNumber + params.lineNumbers.offset
 				) ||
 				highlightedLines.plainText.some(
 					(text) => line.indexOf(text) > -1
@@ -374,6 +350,8 @@ export function getLineClass(
 				);
 		}
 	);
-	if (classList.length === 0) classList = ["code-styler-line"];
+	if (classList.length === 0) {
+		classList = ["code-styler-line"];
+	}
 	return classList;
 }

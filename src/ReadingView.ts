@@ -62,8 +62,11 @@ export async function readingViewCodeblockDecoratingPostProcessor(
 		Boolean(element.querySelector("div.slides > *"));
 	if (printing && !plugin.settings.decoratePrint) return;
 
-	const codeblockPreElements: HTMLElement[] =
-		await getCodeblockPreElements(element, specific, editingEmbeds);
+	const codeblockPreElements: HTMLElement[] = await getCodeblockPreElements(
+		element,
+		specific,
+		editingEmbeds
+	);
 	if (codeblockPreElements.length === 0 && !(editingEmbeds && specific))
 		return;
 
@@ -763,29 +766,28 @@ function convertCommentLinks(
 }
 
 function insertLineWrapper(
-	codeblockCodeElement: HTMLElement,
-	codeblockParameters: CodeblockParameters,
+	el: HTMLElement,
+	params: CodeblockParameters,
 	lineNumber: number,
 	line: string,
 	showLineNumbers: boolean
 ): void {
 	const lineWrapper = document.createElement("div");
-	codeblockCodeElement.appendChild(lineWrapper);
-	getLineClasses(codeblockParameters, lineNumber, line).forEach((lineClass) =>
+	el.appendChild(lineWrapper);
+	getLineClasses(params, lineNumber, line).forEach((lineClass) =>
 		lineWrapper.classList.add(lineClass)
 	);
 	if (
-		(showLineNumbers && !codeblockParameters.lineNumbers.alwaysDisabled) ||
-		codeblockParameters.lineNumbers.alwaysEnabled
-	)
+		(showLineNumbers && !params.lineNumbers.alwaysDisabled) ||
+		params.lineNumbers.alwaysEnabled
+	) {
 		lineWrapper.appendChild(
 			createDiv({
 				cls: "code-styler-line-number",
-				text: (
-					lineNumber + codeblockParameters.lineNumbers.offset
-				).toString(),
+				text: (lineNumber + params.lineNumbers.offset).toString(),
 			})
 		);
+	}
 	lineWrapper.appendChild(
 		createDiv({
 			cls: "code-styler-line-text",
@@ -803,27 +805,27 @@ function countTabs(text: string): number {
 }
 
 async function getHighlightedHTML(
-	parameters: InlineCodeParameters,
+	params: InlineCodeParameters,
 	text: string,
 	plugin: CodeStylerPlugin
 ): Promise<string> {
-	const temporaryRenderingContainer = createDiv();
+	const container = createDiv();
 	MarkdownRenderer.render(
 		plugin.app,
-		["```", parameters.language, "\n", text, "\n", "```"].join(""),
-		temporaryRenderingContainer,
+		["```", params.language, "\n", text, "\n", "```"].join(""),
+		container,
 		"",
 		plugin
 	);
-	const renderedCodeElement =
-		temporaryRenderingContainer.querySelector("code");
-	if (!renderedCodeElement) return "ERROR: Could not render highlighted code";
+	const el = container.querySelector("code");
+	if (!el) return "ERROR: Could not render highlighted code";
 	while (
 		plugin.settings.currentTheme.settings.inline.syntaxHighlight &&
-		!renderedCodeElement.classList.contains("is-loaded")
-	)
+		!el.classList.contains("is-loaded")
+	) {
 		await sleep(2);
-	return renderedCodeElement.innerHTML;
+	}
+	return el.innerHTML;
 }
 
 export const executeCodeMutationObserver = new MutationObserver((mutations) => {

@@ -3,6 +3,7 @@ const MODES = ["reference", "yaml-frontmatter"];
 export function addModes() {
 	MODES.forEach((mode) => addMode(mode));
 }
+
 export function removeModes() {
 	MODES.forEach((mode) => removeMode(mode));
 }
@@ -22,9 +23,10 @@ function removeMode(modeName: string) {
 	const modeIndex = window.CodeMirror.modeInfo.findIndex(
 		(mode: any) => mode.mode === modeName
 	);
-	if (modeIndex !== -1)
+	if (modeIndex !== -1) {
 		//@ts-expect-error Undocumented Obsidian API
 		window.CodeMirror.modeInfo.splice(modeIndex, 1);
+	}
 }
 
 export function addReferenceSyntaxHighlight(
