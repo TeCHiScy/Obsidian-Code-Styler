@@ -165,6 +165,8 @@ async function readCache(plugin: CodeStylerPlugin): Promise<Cache> {
 async function updateCache(cache: Cache, plugin: CodeStylerPlugin): Promise<void> {
 	await plugin.app.vault.adapter.write(plugin.app.vault.configDir + EXTERNAL_REFERENCE_CACHE, JSON.stringify(cache));
 }
+
+// TODO
 function idExternalReference(fileLink: string): {id: string, website: string} {
 	const linkInfo = /^https?:\/\/(.+)\/(.+)$/.exec(fileLink);
 	if (!linkInfo?.[1] || !linkInfo?.[2])

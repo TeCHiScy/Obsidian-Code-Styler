@@ -242,7 +242,7 @@ function parseCodeblockParameterString(parameterString: string, codeblockParamet
 		addHighlights(parameterString,codeblockParameters,theme);
 }
 function manageTitle(parameterString: string, codeblockParameters: CodeblockParameters) {
-	const titleMatch = /(["']?)([^\1]+)\1/.exec(parameterString.slice("title:".length));
+	const titleMatch = /(["']?)([^\0x1]+)\1/.exec(parameterString.slice("title:".length));
 	if (titleMatch)
 		codeblockParameters.title = titleMatch[2].trim();
 	parameterString = parameterString.slice("title:".length);
@@ -287,7 +287,7 @@ function manageFolding(parameterString: string, codeblockParameters: CodeblockPa
 			placeholder: "",
 		};
 	} else {
-		const foldPlaceholderMatch = /(["']?)([^\1]+)\1/.exec(parameterString.slice("fold:".length));
+		const foldPlaceholderMatch = /(["']?)([^\0x1]+)\1/.exec(parameterString.slice("fold:".length));
 		if (foldPlaceholderMatch) {
 			codeblockParameters.fold = {
 				enabled: true,
