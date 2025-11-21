@@ -206,6 +206,7 @@ function cacheToReferencesByFile(cache: Cache): ReferenceByFile {
 		return result;
 	}, {});
 }
+
 function referencesByFileToCache(
 	referencesByFile: ReferenceByFile,
 	cache: Cache
@@ -226,6 +227,7 @@ function referencesByFileToCache(
 		{}
 	);
 }
+
 async function getFileReferences(
 	sourcePath: string,
 	plugin: CodeStylerPlugin
@@ -279,6 +281,7 @@ export async function updateExternalReference(
 		throw Error(`Could not download file: ${error}`);
 	}
 }
+
 async function accessExternalReference(
 	reference: Reference,
 	id: string,
@@ -304,6 +307,7 @@ async function accessExternalReference(
 		throw Error(error);
 	}
 }
+
 async function readCache(plugin: CodeStylerPlugin): Promise<Cache> {
 	return JSON.parse(
 		await plugin.app.vault.adapter.read(
@@ -311,6 +315,7 @@ async function readCache(plugin: CodeStylerPlugin): Promise<Cache> {
 		)
 	);
 }
+
 async function updateCache(
 	cache: Cache,
 	plugin: CodeStylerPlugin
@@ -320,6 +325,7 @@ async function updateCache(
 		JSON.stringify(cache)
 	);
 }
+
 function idExternalReference(fileLink: string): {
 	id: string;
 	website: string;
@@ -360,6 +366,7 @@ function getPath(
 		);
 	else throw Error("Cannot resolve path");
 }
+
 function getRelativePath(filePath: string, sourcePath: string) {
 	if (filePath.startsWith("./")) filePath = filePath.substring(2);
 	const vaultDirs = sourcePath.split("/");
