@@ -12,18 +12,19 @@ export function parseInlineCode(codeText: string): {
 		/^{((?:[^"'{}\\]|\\.|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')*)} *?([^ ].*)$/.exec(
 			codeText
 		);
-
 	if (
 		typeof match?.[1] !== "undefined" &&
 		typeof match?.[2] !== "undefined"
 	) {
-		if (match[1] === "") return { parameters: null, text: match[2] };
-		else
-			return {
-				parameters: parseInlineCodeParameters(match[1]),
-				text: match[2],
-			};
-	} else return { parameters: null, text: codeText };
+		if (match[1] === "") {
+			return { parameters: null, text: match[2] };
+		}
+		return {
+			parameters: parseInlineCodeParameters(match[1]),
+			text: match[2],
+		};
+	}
+	return { parameters: null, text: codeText };
 }
 
 function parseInlineCodeParameters(
@@ -60,14 +61,16 @@ function parseInlineCodeParameterString(
 		const titleMatch = /(["']?)([^\0x1]+)\1/.exec(
 			parameterString.slice("title:".length)
 		);
-		if (titleMatch)
+		if (titleMatch) {
 			inlineCodeParameters.title = titleMatch[2]
 				.trim()
 				.replace(/\\{/g, "{");
+		}
 	} else if (
 		parameterString === "icon" ||
 		(parameterString.startsWith("icon:") &&
 			parameterString.toLowerCase() === "icon:true")
-	)
+	) {
 		inlineCodeParameters.icon = true;
+	}
 }

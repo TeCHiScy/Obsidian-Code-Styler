@@ -1,11 +1,11 @@
 import { MarkdownPreviewRenderer, Plugin } from "obsidian";
+import { basename } from "path";
 
-import CodeStylerPlugin from "../main";
+import CodeStylerPlugin from "src/main";
 import { CodeStylerTheme, EXECUTE_CODE_SUPPORTED_LANGUAGES } from "../Settings";
 import { CodeBlockArgs, getArgs } from "../External/ExecuteCode/CodeBlockArgs";
-import { getReference } from "src/Referencing";
-import { Reference } from "./ReferenceParsing";
-import { basename } from "path";
+import { getRef } from "src/Referencing";
+import { ExtRef } from "./ReferenceParsing";
 
 export interface CodeblockParameters {
 	language: string;
@@ -30,7 +30,7 @@ export interface CodeblockParameters {
 		alternative: Record<string, Highlights>;
 	};
 	ignore: boolean;
-	externalReference?: Reference;
+	externalReference?: ExtRef;
 }
 
 export interface Highlights {
@@ -139,12 +139,12 @@ async function parseCodeblocks(
 }
 
 async function parseCodeblock(
-	codeblockLines: string[],
+	lines: string[],
 	plugin: CodeStylerPlugin,
 	plugins: Record<string, ExternalPlugin>,
 	sourcePath?: string
 ): Promise<CodeblockParameters | null> {
-	const parameterLine = getParameterLine(codeblockLines);
+	const parameterLine = getParameterLine(lines);
 	if (!parameterLine) return null;
 	const codeblockParameters = parseCodeblockParameters(
 		parameterLine,
@@ -165,15 +165,10 @@ async function parseCodeblock(
 				codeblockParameters,
 				plugin,
 				plugins,
-				codeblockLines,
+				lines,
 				sourcePath
 		  )
-		: pluginAdjustParameters(
-				codeblockParameters,
-				plugin,
-				plugins,
-				codeblockLines
-		  ));
+		: pluginAdjustParameters(codeblockParameters, plugin, plugins, lines));
 }
 
 export function parseCodeblockParameters(
@@ -245,7 +240,7 @@ async function pluginAdjustParameters(
 	codeblockParameters: CodeblockParameters,
 	plugin: CodeStylerPlugin,
 	plugins: Record<string, ExternalPlugin>,
-	codeblockLines: string[],
+	lines: string[],
 	sourcePath?: string
 ): Promise<CodeblockParameters> {
 	if (codeblockParameters.language === "reference") {
@@ -253,7 +248,7 @@ async function pluginAdjustParameters(
 			throw Error("Reference block has undefined sourcePath");
 		codeblockParameters = await adjustReference(
 			codeblockParameters,
-			codeblockLines,
+			lines,
 			sourcePath,
 			plugin
 		);
@@ -262,19 +257,15 @@ async function pluginAdjustParameters(
 			? pluginAdjustPreviewCode(
 					codeblockParameters,
 					plugins,
-					codeblockLines,
+					lines,
 					sourcePath
 			  )
-			: pluginAdjustPreviewCode(
-					codeblockParameters,
-					plugins,
-					codeblockLines
-			  ));
+			: pluginAdjustPreviewCode(codeblockParameters, plugins, lines));
 	else if (codeblockParameters.language === "include")
 		codeblockParameters = pluginAdjustFileInclude(
 			codeblockParameters,
 			plugins,
-			codeblockLines
+			lines
 		);
 	else if (/run-\w*/.test(codeblockParameters.language))
 		codeblockParameters = pluginAdjustExecuteCodeRun(
@@ -285,45 +276,43 @@ async function pluginAdjustParameters(
 	codeblockParameters = pluginAdjustExecuteCode(
 		codeblockParameters,
 		plugins,
-		codeblockLines
+		lines
 	);
 	return codeblockParameters;
 }
 
 async function adjustReference(
-	codeblockParameters: CodeblockParameters,
-	codeblockLines: string[],
+	params: CodeblockParameters,
+	lines: string[],
 	sourcePath: string,
 	plugin: CodeStylerPlugin
 ): Promise<CodeblockParameters> {
-	const reference = await getReference(codeblockLines, sourcePath, plugin);
+	const ref = await getRef(lines, sourcePath, plugin);
 	if (
-		!codeblockParameters.lineNumbers.alwaysDisabled &&
-		!codeblockParameters.lineNumbers.alwaysEnabled
+		!params.lineNumbers.alwaysDisabled &&
+		!params.lineNumbers.alwaysEnabled
 	) {
-		codeblockParameters.lineNumbers.offset = reference.startLine - 1;
-		codeblockParameters.lineNumbers.alwaysEnabled = Boolean(
-			reference.startLine !== 1
-		);
+		params.lineNumbers.offset = ref.startLine - 1;
+		params.lineNumbers.alwaysEnabled = ref.startLine !== 1;
 	}
-	if (codeblockParameters.title === "")
-		codeblockParameters.title =
-			reference.external?.info?.title ?? basename(reference.path);
-	if (codeblockParameters.reference === "")
-		codeblockParameters.reference =
-			reference.external?.info?.displayUrl ??
-			reference.external?.info?.url ??
+	if (params.title === "") {
+		params.title = ref.external?.metadata?.title ?? basename(ref.path);
+	}
+	if (params.reference === "") {
+		params.reference =
+			ref.external?.metadata?.displayUrl ??
 			//@ts-expect-error Undocumented Obsidian API
-			plugin.app.vault.adapter.getFilePath(reference.path);
-	codeblockParameters.language = reference.language;
-	if (reference.external) codeblockParameters.externalReference = reference;
-	return codeblockParameters;
+			plugin.app.vault.adapter.getFilePath(ref.path);
+	}
+	params.language = ref.language;
+	params.externalReference = ref.external;
+	return params;
 }
 
 async function pluginAdjustPreviewCode(
-	codeblockParameters: CodeblockParameters,
+	params: CodeblockParameters,
 	plugins: Record<string, ExternalPlugin>,
-	codeblockLines: string[],
+	lines: string[],
 	sourcePath?: string
 ): Promise<CodeblockParameters> {
 	if (
@@ -331,23 +320,22 @@ async function pluginAdjustPreviewCode(
 		plugins?.["obsidian-code-preview"]?.analyzeHighLightLines
 	) {
 		const codePreviewParams = await plugins["obsidian-code-preview"].code(
-			codeblockLines.slice(1, -1).join("\n"),
+			lines.slice(1, -1).join("\n"),
 			sourcePath
 		);
 		if (
-			!codeblockParameters.lineNumbers.alwaysDisabled &&
-			!codeblockParameters.lineNumbers.alwaysEnabled
+			!params.lineNumbers.alwaysDisabled &&
+			!params.lineNumbers.alwaysEnabled
 		) {
 			if (typeof codePreviewParams.start === "number")
-				codeblockParameters.lineNumbers.offset =
-					codePreviewParams.start - 1;
-			codeblockParameters.lineNumbers.alwaysEnabled = Boolean(
+				params.lineNumbers.offset = codePreviewParams.start - 1;
+			params.lineNumbers.alwaysEnabled = Boolean(
 				codePreviewParams.linenumber
 			);
 		}
-		codeblockParameters.highlights.default.lineNumbers = [
+		params.highlights.default.lineNumbers = [
 			...new Set(
-				codeblockParameters.highlights.default.lineNumbers.concat(
+				params.highlights.default.lineNumbers.concat(
 					Array.from(
 						plugins["obsidian-code-preview"].analyzeHighLightLines(
 							codePreviewParams.lines,
@@ -358,27 +346,25 @@ async function pluginAdjustPreviewCode(
 				)
 			),
 		];
-		if (codeblockParameters.title === "")
-			codeblockParameters.title =
+		if (params.title === "")
+			params.title =
 				codePreviewParams.filePath
 					.split("\\")
 					.pop()
 					?.split("/")
 					.pop() ?? "";
-		codeblockParameters.language = codePreviewParams.language;
+		params.language = codePreviewParams.language;
 	}
-	return codeblockParameters;
+	return params;
 }
 
 function pluginAdjustFileInclude(
 	codeblockParameters: CodeblockParameters,
 	plugins: Record<string, ExternalPlugin>,
-	codeblockLines: string[]
+	lines: string[]
 ): CodeblockParameters {
 	if ("file-include" in plugins) {
-		const fileIncludeLanguage = /include (\w+)/.exec(
-			codeblockLines[0]
-		)?.[1];
+		const fileIncludeLanguage = /include (\w+)/.exec(lines[0])?.[1];
 		if (typeof fileIncludeLanguage !== "undefined")
 			codeblockParameters.language = fileIncludeLanguage;
 	}
@@ -386,89 +372,81 @@ function pluginAdjustFileInclude(
 }
 
 function pluginAdjustExecuteCode(
-	codeblockParameters: CodeblockParameters,
+	params: CodeblockParameters,
 	plugins: Record<string, ExternalPlugin>,
 	codeblockLines: string[]
 ): CodeblockParameters {
 	if ("execute-code" in plugins) {
 		const codeblockArgs: CodeBlockArgs = getArgs(codeblockLines[0]);
-		codeblockParameters.title =
-			codeblockParameters.title ?? codeblockArgs?.label ?? "";
+		params.title = params.title ?? codeblockArgs?.label ?? "";
 	}
-	return codeblockParameters;
+	return params;
 }
 
 function pluginAdjustExecuteCodeRun(
-	codeblockParameters: CodeblockParameters,
+	params: CodeblockParameters,
 	plugin: CodeStylerPlugin,
 	plugins: Record<string, ExternalPlugin>
 ): CodeblockParameters {
 	if ("execute-code" in plugins) {
 		if (
 			EXECUTE_CODE_SUPPORTED_LANGUAGES.includes(
-				codeblockParameters.language.slice(4)
+				params.language.slice(4)
 			) &&
 			!isCodeblockIgnored(
-				codeblockParameters.language,
+				params.language,
 				plugin.settings.processedCodeblocksWhitelist
 			)
-		)
-			codeblockParameters.language =
-				codeblockParameters.language.slice(4);
+		) {
+			params.language = params.language.slice(4);
+		}
 	}
-	return codeblockParameters;
+	return params;
 }
 
 function parseCodeblockParameterString(
 	parameterString: string,
-	codeblockParameters: CodeblockParameters,
+	params: CodeblockParameters,
 	theme: CodeStylerTheme
 ): void {
-	if (parameterString === "ignore") codeblockParameters.ignore = true;
+	if (parameterString === "ignore") params.ignore = true;
 	else if (/^title[:=]/.test(parameterString))
-		manageTitle(parameterString, codeblockParameters);
+		manageTitle(parameterString, params);
 	else if (
 		/^ref[:=]/.test(parameterString) ||
 		/^reference[:=]/.test(parameterString)
 	)
-		manageReference(parameterString, codeblockParameters);
+		manageReference(parameterString, params);
 	else if (/^fold[:=]?/.test(parameterString))
-		manageFolding(parameterString, codeblockParameters);
+		manageFolding(parameterString, params);
 	else if (/^ln[:=]/.test(parameterString))
-		manageLineNumbering(parameterString, codeblockParameters);
+		manageLineNumbering(parameterString, params);
 	else if (/^unwrap[:=]?/.test(parameterString) || parameterString === "wrap")
-		manageWrapping(parameterString, codeblockParameters);
-	else addHighlights(parameterString, codeblockParameters, theme);
+		manageWrapping(parameterString, params);
+	else addHighlights(parameterString, params, theme);
 }
 
-function manageTitle(
-	parameterString: string,
-	codeblockParameters: CodeblockParameters
-) {
+function manageTitle(parameterString: string, params: CodeblockParameters) {
 	const titleMatch = /(["']?)([^\0x1]+)\1/.exec(
 		parameterString.slice("title:".length)
 	);
-	if (titleMatch) codeblockParameters.title = titleMatch[2].trim();
+	if (titleMatch) params.title = titleMatch[2].trim();
 	parameterString = parameterString.slice("title:".length);
 	const linkInfo = manageLink(parameterString);
 	if (linkInfo) {
-		codeblockParameters.title = linkInfo.title;
-		codeblockParameters.reference = linkInfo.reference;
+		params.title = linkInfo.title;
+		params.reference = linkInfo.reference;
 	}
 }
 
-function manageReference(
-	parameterString: string,
-	codeblockParameters: CodeblockParameters
-) {
+function manageReference(parameterString: string, params: CodeblockParameters) {
 	parameterString = parameterString.slice(
 		(/^ref[:=]/.test(parameterString) ? "ref:" : "reference:").length
 	);
 	const linkInfo = manageLink(parameterString);
 	if (linkInfo) {
-		codeblockParameters.reference = linkInfo.reference;
-		if (codeblockParameters.title === "")
-			codeblockParameters.title = linkInfo.title;
+		params.reference = linkInfo.reference;
+		if (params.title === "") params.title = linkInfo.title;
 	}
 }
 
@@ -497,12 +475,9 @@ export function manageLink(
 	return { title: title, reference: reference };
 }
 
-function manageFolding(
-	parameterString: string,
-	codeblockParameters: CodeblockParameters
-) {
+function manageFolding(parameterString: string, params: CodeblockParameters) {
 	if (parameterString === "fold") {
-		codeblockParameters.fold = {
+		params.fold = {
 			enabled: true,
 			placeholder: "",
 		};
@@ -511,7 +486,7 @@ function manageFolding(
 			parameterString.slice("fold:".length)
 		);
 		if (foldPlaceholderMatch) {
-			codeblockParameters.fold = {
+			params.fold = {
 				enabled: true,
 				placeholder: foldPlaceholderMatch[2].trim(),
 			};
@@ -521,23 +496,23 @@ function manageFolding(
 
 function manageLineNumbering(
 	parameterString: string,
-	codeblockParameters: CodeblockParameters
+	params: CodeblockParameters
 ) {
 	parameterString = parameterString.slice("ln:".length);
 	if (/^\d+$/.test(parameterString)) {
-		codeblockParameters.lineNumbers = {
+		params.lineNumbers = {
 			alwaysEnabled: true,
 			alwaysDisabled: false,
 			offset: parseInt(parameterString) - 1,
 		};
 	} else if (parameterString.toLowerCase() === "true") {
-		codeblockParameters.lineNumbers = {
+		params.lineNumbers = {
 			alwaysEnabled: true,
 			alwaysDisabled: false,
 			offset: 0,
 		};
 	} else if (parameterString.toLowerCase() === "false") {
-		codeblockParameters.lineNumbers = {
+		params.lineNumbers = {
 			alwaysEnabled: false,
 			alwaysDisabled: true,
 			offset: 0,

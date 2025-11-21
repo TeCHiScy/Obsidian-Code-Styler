@@ -1,13 +1,14 @@
-import { Plugin, MarkdownView, WorkspaceLeaf } from "obsidian";
+import { Plugin, MarkdownView, WorkspaceLeaf, normalizePath } from "obsidian";
 
 import {
 	convertSettings,
 	DEFAULT_SETTINGS,
 	LANGUAGES,
 	CodeStylerSettings,
-	REFERENCE_CODEBLOCK,
-	EXTERNAL_REFERENCE_PATH,
-	EXTERNAL_REFERENCE_CACHE,
+	REF_CODEBLOCK,
+	EXT_REF_PATH,
+	EXT_REF_CACHE,
+	EXT_REF_METADATA_SUFFIX,
 } from "./Settings";
 import { SettingsTab } from "./SettingsTab";
 import { removeStylesAndClasses, updateStyling } from "./ApplyStyling";
@@ -24,7 +25,7 @@ import {
 } from "./ReadingView";
 import {
 	cleanExternalReferencedFiles,
-	referenceCodeblockProcessor,
+	refCodeblockProcessor,
 	updateExternalReferencedFiles,
 } from "./Referencing";
 import { addModes, removeModes } from "./SyntaxHighlighting";
@@ -38,8 +39,8 @@ export default class CodeStylerPlugin extends Plugin {
 		zoom: string;
 	};
 
-	async onload(): Promise<void> {
-		await this.loadSettings(); // Load Settings
+	async onload() {
+		await this.loadSettings();
 		const settingsTab = new SettingsTab(this.app, this);
 		this.addSettingTab(settingsTab);
 
@@ -71,9 +72,9 @@ export default class CodeStylerPlugin extends Plugin {
 
 		addModes();
 		this.registerMarkdownCodeBlockProcessor(
-			REFERENCE_CODEBLOCK,
+			REF_CODEBLOCK,
 			async (source, el, ctx) => {
-				await referenceCodeblockProcessor(source, el, ctx, this);
+				await refCodeblockProcessor(source, el, ctx, this);
 			}
 		);
 
@@ -168,11 +169,12 @@ export default class CodeStylerPlugin extends Plugin {
 				const activeView =
 					this.app.workspace.getActiveViewOfType(MarkdownView);
 				if (activeView) {
-					if (activeView.getMode() === "preview")
+					if (activeView.getMode() === "preview") {
 						readingDocumentFold(activeView.contentEl);
-					else if (activeView.getMode() === "source")
+					} else if (activeView.getMode() === "source") {
 						//@ts-expect-error Undocumented Obsidian API
 						editingDocumentFold(activeView.editor.cm.docView.view);
+					}
 				}
 			},
 		});
@@ -206,41 +208,57 @@ export default class CodeStylerPlugin extends Plugin {
 		console.log("Loaded plugin: Code Styler");
 	}
 
-	onunload(): void {
+	onunload() {
 		removeModes();
 		this.executeCodeMutationObserver.disconnect();
 		removeStylesAndClasses();
 		destroyReadingModeElements();
-		for (const url of Object.values(this.languageIcons)) // Unload icons
+		// Unload icons
+		for (const url of Object.values(this.languageIcons)) {
 			URL.revokeObjectURL(url);
+		}
 		console.log("Unloaded plugin: Code Styler");
 	}
 
-	async loadSettings(): Promise<void> {
+	async loadSettings() {
 		this.settings = {
 			...structuredClone(DEFAULT_SETTINGS),
 			...convertSettings(await this.loadData()),
 		};
 	}
 
-	async saveSettings(): Promise<void> {
+	async saveSettings() {
 		await this.saveData(this.settings);
 		this.app.workspace.updateOptions();
 		updateStyling(this.settings, this.app);
 	}
 
-	async initialiseOnLayout(): Promise<void> {
-		if (
-			!(await this.app.vault.adapter.exists(
-				this.app.vault.configDir + EXTERNAL_REFERENCE_PATH
-			))
-		) {
-			// Create folder for external references
-			await this.app.vault.adapter.mkdir(
-				this.app.vault.configDir + EXTERNAL_REFERENCE_PATH
-			);
+	refPath(): string {
+		return normalizePath(this.app.vault.configDir + "/" + EXT_REF_PATH);
+	}
+
+	cachePath(): string {
+		return normalizePath(this.refPath() + "/" + EXT_REF_CACHE);
+	}
+
+	refContentPath(id: string): string {
+		return normalizePath(this.refPath() + "/" + id);
+	}
+
+	refMetadataPath(id: string): string {
+		return normalizePath(
+			this.refPath() + "/" + id + EXT_REF_METADATA_SUFFIX
+		);
+	}
+
+	async initialiseOnLayout() {
+		// Create assets for external references
+		if (!await this.app.vault.adapter.exists(this.refPath())) {
+			await this.app.vault.adapter.mkdir(this.refPath());
+		}
+		if (!await this.app.vault.adapter.exists(this.cachePath())) {
 			await this.app.vault.adapter.write(
-				this.app.vault.configDir + EXTERNAL_REFERENCE_CACHE,
+				this.cachePath(),
 				JSON.stringify({})
 			);
 		}
@@ -252,13 +270,25 @@ export default class CodeStylerPlugin extends Plugin {
 		}
 	}
 
-	renderReadingView(): void {
+	renderReadingView() {
 		this.app.workspace.iterateRootLeaves((leaf: WorkspaceLeaf) => {
 			if (
 				leaf.view instanceof MarkdownView &&
 				leaf.view.getMode() === "preview"
-			)
+			) {
 				leaf.view.previewMode.rerender(true);
+			}
 		});
+	}
+
+	async update(path: string, data: any, serialize: boolean = true) {
+		await this.app.vault.adapter.write(
+			path,
+			serialize ? JSON.stringify(data) : data
+		);
+	}
+
+	async delete(path: string) {
+		await this.app.vault.adapter.remove(path);
 	}
 }

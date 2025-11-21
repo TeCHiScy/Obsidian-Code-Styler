@@ -1287,6 +1287,7 @@ function getInlineCodeRanges(
 		},
 	};
 }
+
 function getInlineDelimiterSize(syntaxNode: SyntaxNodeRef): number | null {
 	const properties = new Set(
 		syntaxNode.node.type.prop<string>(tokenClassNodeProp)?.split(" ")
@@ -1297,6 +1298,7 @@ function getInlineDelimiterSize(syntaxNode: SyntaxNodeRef): number | null {
 	if (!previousSibling) return null;
 	return previousSibling.to - previousSibling.from;
 }
+
 function addUnstyledInlineDecorations(
 	state: EditorState,
 	builder: RangeSetBuilder<Decoration>,
@@ -1429,9 +1431,11 @@ function unhideFoldUpdate(range: Range<Decoration>) {
 			!(from === range.from && to === range.to),
 	};
 }
+
 function foldDecoration(language: string): Decoration {
 	return Decoration.replace({ block: true, language: language });
 }
+
 function rangeInteraction(
 	from: number,
 	to: number,

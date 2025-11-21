@@ -1,200 +1,154 @@
 import {
 	MarkdownPostProcessorContext,
 	MarkdownRenderer,
-	MarkdownSectionInformation,
 	SectionCache,
-	normalizePath,
-	request,
 } from "obsidian";
 import {
-	Reference,
+	ExtRef,
+	ExtRefParams,
+	Ref,
 	getLineLimits,
-	parseExternalReference,
-	parseReferenceParameters,
+	_fetchExtRef,
+	parseRefParams,
+	ExtRefMetadata,
 } from "src/Parsing/ReferenceParsing";
-import {
-	EXTERNAL_REFERENCE_PATH,
-	EXTERNAL_REFERENCE_INFO_SUFFIX,
-	LOCAL_PREFIX,
-	REFERENCE_CODEBLOCK,
-	EXTERNAL_REFERENCE_CACHE,
-} from "src/Settings";
+import { REF_CODEBLOCK } from "src/Settings";
 import CodeStylerPlugin from "src/main";
 import { renderSpecificReadingSection } from "./ReadingView";
 import { getFileContentLines } from "./Parsing/CodeblockParsing";
 
 type Cache = Record<string, IdCache>;
+
 interface IdCache {
 	sourcePaths: string[];
-	reference: Reference;
+	extRefParams: ExtRefParams;
 }
+
 type ReferenceByFile = Record<string, string[]>;
 
-export async function referenceCodeblockProcessor(
+export async function refCodeblockProcessor(
 	source: string,
-	codeblockElement: HTMLElement,
-	context: MarkdownPostProcessorContext,
+	el: HTMLElement,
+	ctx: MarkdownPostProcessorContext,
 	plugin: CodeStylerPlugin
 ) {
-	const codeblockSectionInfo: MarkdownSectionInformation | null =
-		context.getSectionInfo(codeblockElement);
-	if (codeblockSectionInfo === null)
+	const info = ctx.getSectionInfo(el);
+	if (info === null) {
 		throw Error("Could not retrieve codeblock information");
+	}
 
-	const codeblockLines = [
-		codeblockSectionInfo.text.split("\n")[codeblockSectionInfo.lineStart],
+	const lines = [
+		info.text.split("\n")[info.lineStart],
 		...source.split("\n"),
 	];
-	if (codeblockLines[codeblockLines.length - 1] !== "")
-		codeblockLines.push("");
-	const reference = await getReference(
-		codeblockLines,
-		context.sourcePath,
-		plugin
-	);
-	MarkdownRenderer.render(
-		plugin.app,
-		reference.code,
-		codeblockElement,
-		context.sourcePath,
-		plugin
-	);
+	if (lines[lines.length - 1] !== "") {
+		lines.push("");
+	}
+	const ref = await getRef(lines, ctx.sourcePath, plugin);
+	MarkdownRenderer.render(plugin.app, ref.code, el, ctx.sourcePath, plugin);
 	renderSpecificReadingSection(
-		Array.from(codeblockElement.querySelectorAll("pre:not(.frontmatter)")),
-		context.sourcePath,
-		codeblockSectionInfo,
+		Array.from(el.querySelectorAll("pre:not(.frontmatter)")),
+		ctx.sourcePath,
+		info,
 		plugin
 	);
 }
 
-export async function getReference(
-	codeblockLines: string[],
+export async function getRef(
+	lines: string[],
 	sourcePath: string,
 	plugin: CodeStylerPlugin
-): Promise<Reference> {
-	const reference: Reference = {
-		code: "",
-		language: "",
-		startLine: 1,
-		path: "",
-	};
-
+): Promise<Ref> {
 	try {
-		const referenceParameters = parseReferenceParameters(
-			codeblockLines.slice(1, -1).join("\n")
+		const params = parseRefParams(
+			lines.slice(1, -1).join("\n"),
+			sourcePath,
+			plugin
 		);
-		reference.language = referenceParameters.language;
-		reference.path = referenceParameters.filePath;
-		if (/^https?:\/\//.test(referenceParameters.filePath)) {
-			const externalReferenceId = idExternalReference(reference.path);
-			reference.external = {
-				id: externalReferenceId.id,
-				website: externalReferenceId.website,
-				storePath:
-					plugin.app.vault.configDir +
-					EXTERNAL_REFERENCE_PATH +
-					externalReferenceId.id,
-				info: {
-					title: "",
-					url: reference.path,
-					site: externalReferenceId.website,
-					datetime: "",
-					rawUrl: reference.path,
-				},
-			};
-			referenceParameters.filePath = await accessExternalReference(
-				reference,
-				externalReferenceId.id,
-				sourcePath,
-				plugin
-			);
-			reference.external.info = {
-				...reference.external.info,
-				...JSON.parse(
-					await plugin.app.vault.adapter.read(
-						reference.external.storePath +
-							EXTERNAL_REFERENCE_INFO_SUFFIX
-					)
-				),
-			};
+		let extRef: ExtRef | undefined = undefined;
+		if (params.external) {
+			extRef = await fetchExtRef(params.external, sourcePath, plugin);
 		}
-		const vaultPath = getPath(referenceParameters.filePath, "", plugin);
-		if (
-			referenceParameters.filePath.startsWith("[[") &&
-			referenceParameters.filePath.endsWith("]]")
-		)
-			reference.path = vaultPath;
-		if (!(await plugin.app.vault.adapter.exists(vaultPath)))
-			throw Error(`Local File does not exist at ${vaultPath}`);
-		const codeContent = (
-			await plugin.app.vault.adapter.read(vaultPath)
+
+		if (!await plugin.app.vault.adapter.exists(params.storePath)) {
+			throw Error(`Local file '${params.storePath}' not exist`);
+		}
+
+		const content = (
+			await plugin.app.vault.adapter.read(params.storePath)
 		).trim();
-		const codeSectionInfo = getLineLimits(codeContent, referenceParameters);
-		reference.startLine = codeSectionInfo.startLine;
-		reference.code = [
-			"```",
-			referenceParameters.language,
-			" ",
-			codeblockLines[0].substring(REFERENCE_CODEBLOCK.length).trim(),
-			"\n",
-			codeSectionInfo.codeSection,
-			"\n",
-			"```",
-		].join("");
+		const sectionInfo = getLineLimits(content, params);
+		return {
+			path: params.path,
+			language: params.language,
+			external: extRef,
+			startLine: sectionInfo.startLine,
+			code: [
+				"```",
+				params.language,
+				" ",
+				lines[0].substring(REF_CODEBLOCK.length).trim(),
+				"\n",
+				sectionInfo.codeSection,
+				"\n",
+				"```",
+			].join(""),
+		};
 	} catch (error) {
-		reference.code = `> [!error] ${(error instanceof Error
-			? error.message
-			: String(error)
-		).replace(/\n/g, "\n>")}`;
+		return {
+			language: "",
+			startLine: 1,
+			path: "",
+			code: `> [!error] ${(error instanceof Error
+				? error.message
+				: String(error)
+			).replace(/\n/g, "\n>")}`,
+		};
 	}
-	return reference;
 }
 
 export async function updateExternalReferencedFiles(
 	plugin: CodeStylerPlugin,
 	sourcePath: string | undefined = undefined
-): Promise<void> {
+) {
 	await cleanExternalReferencedFiles(plugin);
 	const cache = await readCache(plugin);
-	const references =
-		typeof sourcePath !== "undefined"
-			? await getFileReferences(sourcePath, plugin)
-			: Object.values(cache).map((idCache: IdCache) => idCache.reference);
-	for (const reference of references) {
-		await updateExternalReference(reference, plugin);
-		cache[reference?.external?.id as string].reference = reference;
+	const refs =
+		sourcePath !== undefined
+			? await getFileExtRefParams(sourcePath, plugin)
+			: Object.values(cache).map(
+					(idCache: IdCache) => idCache.extRefParams
+			  );
+	for (const ref of refs) {
+		await updateExtRef(ref, plugin);
+		cache[ref.id as string].extRefParams = ref;
 	}
-	await updateCache(cache, plugin);
+	await writeCache(cache, plugin);
 	plugin.renderReadingView();
 }
+
 export async function cleanExternalReferencedFiles(
 	plugin: CodeStylerPlugin
 ): Promise<void> {
 	const cache = await readCache(plugin);
-	const referencesByFile = cacheToReferencesByFile(cache);
-	for (const sourcePath of Object.keys(referencesByFile)) {
-		const fileReferenceIds = (
-			await getFileReferences(sourcePath, plugin)
-		).map((reference: Reference) => reference?.external?.id as string);
-		referencesByFile[sourcePath] = referencesByFile[sourcePath].filter(
-			(id: string) => fileReferenceIds.includes(id)
+	const refsByFile = cacheToReferencesByFile(cache);
+	for (const sourcePath of Object.keys(refsByFile)) {
+		const extRefIds = (await getFileExtRefParams(sourcePath, plugin)).map(
+			(params: ExtRefParams) => params.id
+		);
+		refsByFile[sourcePath] = refsByFile[sourcePath].filter((id: string) =>
+			extRefIds.includes(id)
 		);
 	}
-	const new_cache = referencesByFileToCache(referencesByFile, cache);
+	const newCache = refsByFileToCache(refsByFile, cache);
 	for (const id of Object.keys(cache)) {
-		if (!Object.keys(new_cache).includes(id)) {
-			await plugin.app.vault.adapter.remove(
-				plugin.app.vault.configDir + EXTERNAL_REFERENCE_PATH + id
-			);
-			await plugin.app.vault.adapter.remove(
-				plugin.app.vault.configDir +
-					EXTERNAL_REFERENCE_PATH +
-					id +
-					EXTERNAL_REFERENCE_INFO_SUFFIX
-			);
+		if (Object.keys(newCache).includes(id)) {
+			continue;
 		}
+		await plugin.delete(plugin.refContentPath(id));
+		await plugin.delete(plugin.refMetadataPath(id));
 	}
-	await updateCache(new_cache, plugin);
+	await writeCache(newCache, plugin);
 }
 
 function cacheToReferencesByFile(cache: Cache): ReferenceByFile {
@@ -207,40 +161,42 @@ function cacheToReferencesByFile(cache: Cache): ReferenceByFile {
 	}, {});
 }
 
-function referencesByFileToCache(
-	referencesByFile: ReferenceByFile,
-	cache: Cache
-): Cache {
-	return Object.keys(referencesByFile).reduce(
-		(new_cache: Cache, sourcePath: string) => {
-			referencesByFile[sourcePath].forEach((id: string) => {
-				if (typeof new_cache?.[id] === "undefined")
-					new_cache[id] = {
+function refsByFileToCache(refsByFile: ReferenceByFile, cache: Cache): Cache {
+	return Object.keys(refsByFile).reduce(
+		(newCache: Cache, sourcePath: string) => {
+			refsByFile[sourcePath].forEach((id: string) => {
+				if (typeof newCache?.[id] === "undefined")
+					newCache[id] = {
 						sourcePaths: [sourcePath],
-						reference: cache[id].reference,
+						extRefParams: cache[id].extRefParams,
 					};
-				else if (!new_cache[id].sourcePaths.includes(sourcePath))
-					new_cache[id].sourcePaths.push(sourcePath);
+				else if (!newCache[id].sourcePaths.includes(sourcePath))
+					newCache[id].sourcePaths.push(sourcePath);
 			});
-			return new_cache;
+			return newCache;
 		},
 		{}
 	);
 }
 
-async function getFileReferences(
+async function getFileExtRefParams(
 	sourcePath: string,
 	plugin: CodeStylerPlugin
-): Promise<Reference[]> {
-	const fileContentLines = await getFileContentLines(sourcePath, plugin);
-	if (!fileContentLines) throw Error(`File could not be read: ${sourcePath}`);
-	const fileReference = [];
+): Promise<ExtRefParams[]> {
+	const lines = await getFileContentLines(sourcePath, plugin);
+	if (!lines) {
+		throw Error(`File could not be read: ${sourcePath}`);
+	}
+	const refs = [];
 	const sections: SectionCache[] =
 		plugin.app.metadataCache.getCache(sourcePath)?.sections ?? [];
+
 	for (const section of sections) {
-		if (section.type !== "code") continue;
+		if (section.type !== "code") {
+			continue;
+		}
 		const codeblockLines = [
-			...fileContentLines.slice(
+			...lines.slice(
 				section.position.start.line,
 				section.position.end.line
 			),
@@ -249,130 +205,81 @@ async function getFileReferences(
 		if (
 			!codeblockLines[0].includes("```reference") &&
 			!codeblockLines[0].includes("~~~reference")
-		)
+		) {
 			continue;
-		const reference = await getReference(
-			codeblockLines,
+		}
+		const params = parseRefParams(
+			codeblockLines.slice(1, -1).join("\n"),
 			sourcePath,
 			plugin
 		);
-		if (reference?.external?.id) fileReference.push(reference);
+		if (params.external) {
+			refs.push(params.external);
+		}
 	}
-	return fileReference;
+	return refs;
 }
 
-export async function updateExternalReference(
-	reference: Reference,
+export async function updateExtRef(
+	params: ExtRefParams,
 	plugin: CodeStylerPlugin
-) {
-	try {
-		const sourceInfo = await parseExternalReference(reference);
-		const content = await request(sourceInfo.rawUrl ?? reference.path);
-		await plugin.app.vault.adapter.write(
-			reference?.external?.storePath as string,
-			content
-		);
-		await plugin.app.vault.adapter.write(
-			(reference?.external?.storePath as string) +
-				EXTERNAL_REFERENCE_INFO_SUFFIX,
-			JSON.stringify(sourceInfo)
-		);
-	} catch (error) {
-		throw Error(`Could not download file: ${error}`);
-	}
+): Promise<ExtRef> {
+	const ref = await _fetchExtRef(params);
+	await plugin.update(params.storePath, ref.content, false);
+	await plugin.update(plugin.refMetadataPath(params.id), ref.metadata);
+	return ref;
 }
 
-async function accessExternalReference(
-	reference: Reference,
-	id: string,
+async function fetchExtRef(
+	params: ExtRefParams,
 	sourcePath: string,
 	plugin: CodeStylerPlugin
-): Promise<string> {
-	try {
-		if (
-			!(await plugin.app.vault.adapter.exists(
-				reference?.external?.storePath as string
-			))
-		)
-			await updateExternalReference(reference, plugin);
-		const cache = await readCache(plugin);
-		if (!cache[id]?.sourcePaths?.includes(sourcePath)) {
-			if (!cache?.[id])
-				cache[id] = { sourcePaths: [sourcePath], reference: reference };
-			else cache[id].sourcePaths.push(sourcePath);
-			await updateCache(cache, plugin);
-		}
-		return reference?.external?.storePath as string;
-	} catch (error) {
-		throw Error(error);
+): Promise<ExtRef> {
+	let ref: ExtRef;
+	if (!await plugin.app.vault.adapter.exists(params.storePath)) {
+		ref = await updateExtRef(params, plugin);
+	} else {
+		ref = {
+			id: params.id,
+			params: params,
+			content: await plugin.app.vault.adapter.read(params.storePath),
+			metadata: await readExtRefMetadata(params.id, plugin),
+		};
 	}
+	const cache = await readCache(plugin);
+	if (!cache[params.id]?.sourcePaths?.includes(sourcePath)) {
+		if (!cache?.[params.id]) {
+			cache[params.id] = { sourcePaths: [], extRefParams: params };
+		}
+		cache[params.id].sourcePaths.push(sourcePath);
+		await writeCache(cache, plugin);
+	}
+	return ref;
 }
 
 async function readCache(plugin: CodeStylerPlugin): Promise<Cache> {
-	return JSON.parse(
-		await plugin.app.vault.adapter.read(
-			plugin.app.vault.configDir + EXTERNAL_REFERENCE_CACHE
-		)
-	);
-}
-
-async function updateCache(
-	cache: Cache,
-	plugin: CodeStylerPlugin
-): Promise<void> {
-	await plugin.app.vault.adapter.write(
-		plugin.app.vault.configDir + EXTERNAL_REFERENCE_CACHE,
-		JSON.stringify(cache)
-	);
-}
-
-function idExternalReference(fileLink: string): {
-	id: string;
-	website: string;
-} {
-	const linkInfo = /^https?:\/\/(.+)\.com\/(.+)$/.exec(fileLink);
-	if (!linkInfo?.[1] || !linkInfo?.[2])
-		throw Error("No such repository could be found");
-	return {
-		id: [linkInfo[1], ...linkInfo[2].split("/")].join("-"),
-		website: linkInfo[1],
-	};
-}
-
-function getPath(
-	filePath: string,
-	sourcePath: string,
-	plugin: CodeStylerPlugin
-): string {
-	filePath = filePath.trim();
-	if (filePath.startsWith("[[") && filePath.endsWith("]]"))
-		return (
-			plugin.app.metadataCache.getFirstLinkpathDest(
-				filePath.slice(2, -2),
-				sourcePath
-			)?.path ?? filePath
+	try {
+		return JSON.parse(
+			await plugin.app.vault.adapter.read(plugin.cachePath())
 		);
-	filePath = filePath.replace("\\", "/");
-	if (filePath.startsWith(LOCAL_PREFIX)) return filePath.substring(2);
-	else if (filePath.startsWith("./") || /^[^<:"/\\>?|*]/.test(filePath)) {
-		if (!sourcePath && sourcePath != "")
-			throw Error(
-				"Cannot resolve relative path because the source path is missing"
-			);
-		return getRelativePath(filePath, sourcePath.trim());
-	} else if (filePath.startsWith("/"))
-		throw Error(
-			`Path should not start with "/", use "${LOCAL_PREFIX}" to reference a path relative to the vault root folder`
-		);
-	else throw Error("Cannot resolve path");
+	} catch {
+		return {};
+	}
 }
 
-function getRelativePath(filePath: string, sourcePath: string) {
-	if (filePath.startsWith("./")) filePath = filePath.substring(2);
-	const vaultDirs = sourcePath.split("/");
-	vaultDirs.pop();
-	while (filePath.startsWith("../"))
-		if (vaultDirs.pop() !== undefined) filePath = filePath.substring(3);
-		else throw Error('Path references outside vault, too many "../"s used');
-	return normalizePath([...vaultDirs, filePath].join("/"));
+async function writeCache(cache: Cache, plugin: CodeStylerPlugin) {
+	await plugin.update(plugin.cachePath(), cache);
+}
+
+async function readExtRefMetadata(
+	id: string,
+	plugin: CodeStylerPlugin
+): Promise<Partial<ExtRefMetadata>> {
+	try {
+		return JSON.parse(
+			await plugin.app.vault.adapter.read(plugin.refMetadataPath(id))
+		);
+	} catch {
+		return {};
+	}
 }
