@@ -342,7 +342,7 @@ export class SettingsTab extends PluginSettingTab {
 						this.updateAlternativeHighlights();
 						this.plugin.settings.newTheme = "";
 						newThemeName.setValue("");
-						newThemeDefault.setValue(false);
+						// newThemeDefault.setValue(false);
 						this.saveSettings();
 					}
 				});
