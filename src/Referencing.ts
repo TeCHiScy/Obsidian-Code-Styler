@@ -324,7 +324,7 @@ function idExternalReference(fileLink: string): {
 	id: string;
 	website: string;
 } {
-	const linkInfo = /^https?:\/\/(.+)\.com\/(.+)$/.exec(fileLink);
+	const linkInfo = /^https?:\/\/(.+)\/(.+)$/.exec(fileLink);
 	if (!linkInfo?.[1] || !linkInfo?.[2])
 		throw Error("No such repository could be found");
 	return {
