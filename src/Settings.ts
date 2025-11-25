@@ -134,7 +134,7 @@ export interface CodeStylerSettings {
 export interface Language {
 	icon?: string;
 	colour?: Colour;
-	inlineComment?: Array<string>;
+	inlineComment?: string[];
 	blockComment?: Array<{
 		open: string;
 		close: string;

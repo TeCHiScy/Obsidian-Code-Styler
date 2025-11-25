@@ -367,13 +367,13 @@ export function createCodeblockCodeMirrorExtensions(
 					setDifference(
 						currentExcludedCodeblocks,
 						initialExcludedCodeblocks
-					) as Array<string>
+					) as string[]
 				);
 				readdFoldLanguages = readdFoldLanguages.concat(
 					setDifference(
 						initialExcludedCodeblocks,
 						currentExcludedCodeblocks
-					) as Array<string>
+					) as string[]
 				);
 			}
 			if (

@@ -34,13 +34,13 @@ export interface CodeblockParameters {
 }
 
 export interface Highlights {
-	lineNumbers: Array<number>;
-	plainText: Array<string>;
-	regularExpressions: Array<RegExp>;
+	lineNumbers: number[];
+	plainText: string[];
+	regularExpressions: RegExp[];
 }
 
 interface ExternalPlugin extends Plugin {
-	supportedLanguages?: Array<string>;
+	supportedLanguages?: string[];
 	code?: (
 		source: string,
 		sourcePath?: string
@@ -139,7 +139,7 @@ async function parseCodeblocks(
 }
 
 async function parseCodeblock(
-	codeblockLines: Array<string>,
+	codeblockLines: string[],
 	plugin: CodeStylerPlugin,
 	plugins: Record<string, ExternalPlugin>,
 	sourcePath?: string

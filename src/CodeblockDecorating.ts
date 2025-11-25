@@ -240,7 +240,7 @@ function createExecuteCodeContainer(
 export function createInlineOpener(
 	inlineCodeParameters: InlineCodeParameters,
 	languageIcons: Record<string, string>,
-	containerClasses: Array<string> = ["code-styler-inline-opener"]
+	containerClasses: string[] = ["code-styler-inline-opener"]
 ): HTMLElement {
 	const openerContainer = createSpan({ cls: containerClasses.join(" ") });
 	if (inlineCodeParameters.icon) {
