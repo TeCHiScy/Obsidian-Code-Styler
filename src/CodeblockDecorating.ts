@@ -340,8 +340,8 @@ export function getLineClass(
 	codeblockParameters: CodeblockParameters,
 	lineNumber: number,
 	line: string
-): Array<string> {
-	let classList: Array<string> = [];
+): string[] {
+	let classList: string[] = [];
 	if (
 		codeblockParameters.highlights.default.lineNumbers.includes(
 			lineNumber + codeblockParameters.lineNumbers.offset
