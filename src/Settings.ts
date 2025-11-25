@@ -134,13 +134,13 @@ export interface CodeStylerSettings {
 export interface Language {
 	icon?: string;
 	colour?: Colour;
-	inlineComment?: Array<string>;
-	blockComment?: Array<{
+	inlineComment?: string[];
+	blockComment?: {
 		open: string;
 		close: string;
 		continuation?: string; // Default: None
 		multiline?: string; // Default: true
-	}>;
+	}[];
 }
 
 // Theme Defaults
@@ -2202,7 +2202,7 @@ export const LANGUAGES: { [key: string]: Language } = {
 	},
 };
 
-const EXECUTE_CODE_LANGUAGE_ALIASES: Array<string> = [
+const EXECUTE_CODE_LANGUAGE_ALIASES: string[] = [
 	"javascript",
 	"typescript",
 	"bash",
@@ -2213,7 +2213,8 @@ const EXECUTE_CODE_LANGUAGE_ALIASES: Array<string> = [
 	"hs",
 	"py",
 ];
-const EXECUTE_CODE_CANONICAL_LANGUAGES: Array<string> = [
+
+const EXECUTE_CODE_CANONICAL_LANGUAGES: string[] = [
 	"js",
 	"ts",
 	"cs",

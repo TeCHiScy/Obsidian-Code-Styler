@@ -34,13 +34,13 @@ export interface CodeblockParameters {
 }
 
 export interface Highlights {
-	lineNumbers: Array<number>;
-	plainText: Array<string>;
-	regularExpressions: Array<RegExp>;
+	lineNumbers: number[];
+	plainText: string[];
+	regularExpressions: RegExp[];
 }
 
 interface ExternalPlugin extends Plugin {
-	supportedLanguages?: Array<string>;
+	supportedLanguages?: string[];
 	code?: (
 		source: string,
 		sourcePath?: string
@@ -49,7 +49,7 @@ interface ExternalPlugin extends Plugin {
 		code: string;
 		language: string;
 		highlight: string;
-		lines: Array<string>;
+		lines: string[];
 		filePath: string;
 		linenumber: number;
 	}>;
@@ -60,18 +60,18 @@ interface ExternalPlugin extends Plugin {
 }
 
 export async function parseCodeblockSource(
-	codeSection: Array<string>,
+	codeSection: string[],
 	plugin: CodeStylerPlugin,
 	sourcePath?: string
 ): Promise<{
-	codeblocksParameters: Array<CodeblockParameters>;
+	codeblocksParameters: CodeblockParameters[];
 	nested: boolean;
 }> {
 	// @ts-expect-error Undocumented Obsidian API
 	const plugins: Record<string, ExternalPlugin> = plugin.app.plugins.plugins;
 	const admonitions: boolean = "obsidian-admonition" in plugins;
-	const codeblocks: Array<Array<string>> = [];
-	function parseCodeblockSection(codeSection: Array<string>): void {
+	const codeblocks: string[][] = [];
+	function parseCodeblockSection(codeSection: string[]): void {
 		if (codeSection.length === 0) return;
 
 		const openingCodeblockLine = getOpeningLine(codeSection);
@@ -122,12 +122,12 @@ export async function parseCodeblockSource(
 }
 
 async function parseCodeblocks(
-	codeblocks: Array<Array<string>>,
+	codeblocks: string[][],
 	plugin: CodeStylerPlugin,
 	plugins: Record<string, ExternalPlugin>,
 	sourcePath?: string
-): Promise<Array<CodeblockParameters>> {
-	const codeblocksParameters: Array<CodeblockParameters> = [];
+): Promise<CodeblockParameters[]> {
+	const codeblocksParameters: CodeblockParameters[] = [];
 	for (const codeblockLines of codeblocks) {
 		const codeblockParameters = await (typeof sourcePath !== "undefined"
 			? parseCodeblock(codeblockLines, plugin, plugins, sourcePath)
@@ -139,7 +139,7 @@ async function parseCodeblocks(
 }
 
 async function parseCodeblock(
-	codeblockLines: Array<string>,
+	codeblockLines: string[],
 	plugin: CodeStylerPlugin,
 	plugins: Record<string, ExternalPlugin>,
 	sourcePath?: string
@@ -245,7 +245,7 @@ async function pluginAdjustParameters(
 	codeblockParameters: CodeblockParameters,
 	plugin: CodeStylerPlugin,
 	plugins: Record<string, ExternalPlugin>,
-	codeblockLines: Array<string>,
+	codeblockLines: string[],
 	sourcePath?: string
 ): Promise<CodeblockParameters> {
 	if (codeblockParameters.language === "reference") {
@@ -292,7 +292,7 @@ async function pluginAdjustParameters(
 
 async function adjustReference(
 	codeblockParameters: CodeblockParameters,
-	codeblockLines: Array<string>,
+	codeblockLines: string[],
 	sourcePath: string,
 	plugin: CodeStylerPlugin
 ): Promise<CodeblockParameters> {
@@ -323,7 +323,7 @@ async function adjustReference(
 async function pluginAdjustPreviewCode(
 	codeblockParameters: CodeblockParameters,
 	plugins: Record<string, ExternalPlugin>,
-	codeblockLines: Array<string>,
+	codeblockLines: string[],
 	sourcePath?: string
 ): Promise<CodeblockParameters> {
 	if (
@@ -373,7 +373,7 @@ async function pluginAdjustPreviewCode(
 function pluginAdjustFileInclude(
 	codeblockParameters: CodeblockParameters,
 	plugins: Record<string, ExternalPlugin>,
-	codeblockLines: Array<string>
+	codeblockLines: string[]
 ): CodeblockParameters {
 	if ("file-include" in plugins) {
 		const fileIncludeLanguage = /include (\w+)/.exec(
@@ -388,7 +388,7 @@ function pluginAdjustFileInclude(
 function pluginAdjustExecuteCode(
 	codeblockParameters: CodeblockParameters,
 	plugins: Record<string, ExternalPlugin>,
-	codeblockLines: Array<string>
+	codeblockLines: string[]
 ): CodeblockParameters {
 	if ("execute-code" in plugins) {
 		const codeblockArgs: CodeBlockArgs = getArgs(codeblockLines[0]);
@@ -677,7 +677,7 @@ export function isCodeblockIgnored(
 
 function parseRegexExcludedLanguages(
 	excludedLanguagesString: string
-): Array<RegExp> {
+): RegExp[] {
 	return excludedLanguagesString
 		.split(",")
 		.map(
@@ -689,7 +689,7 @@ function parseRegexExcludedLanguages(
 		);
 }
 
-function getParameterLine(codeblockLines: Array<string>): string | undefined {
+function getParameterLine(codeblockLines: string[]): string | undefined {
 	let openingCodeblockLine = getOpeningLine(codeblockLines);
 	if (
 		openingCodeblockLine &&
@@ -700,7 +700,7 @@ function getParameterLine(codeblockLines: Array<string>): string | undefined {
 	return openingCodeblockLine;
 }
 
-function getOpeningLine(codeblockLines: Array<string>): string | undefined {
+function getOpeningLine(codeblockLines: string[]): string | undefined {
 	return codeblockLines.find((line: string) =>
 		Boolean(testOpeningLine(line))
 	);
@@ -733,11 +733,11 @@ export function trimParameterLine(parameterLine: string): string {
 export async function getFileContentLines(
 	sourcePath: string,
 	plugin: CodeStylerPlugin
-): Promise<Array<string>> {
+): Promise<string[]> {
 	return (await plugin.app.vault.adapter.read(sourcePath)).split(/\n/g);
 }
 
-function arraysEqual(array1: Array<unknown>, array2: Array<unknown>): boolean {
+function arraysEqual(array1: unknown[], array2: unknown[]): boolean {
 	return (
 		array1.length === array2.length &&
 		array1.every((el) => array2.includes(el))

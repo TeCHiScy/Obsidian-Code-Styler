@@ -25,10 +25,10 @@ import { getFileContentLines } from "./Parsing/CodeblockParsing";
 
 type Cache = Record<string, IdCache>;
 interface IdCache {
-	sourcePaths: Array<string>;
+	sourcePaths: string[];
 	reference: Reference;
 }
-type ReferenceByFile = Record<string, Array<string>>;
+type ReferenceByFile = Record<string, string[]>;
 
 export async function referenceCodeblockProcessor(
 	source: string,
@@ -68,7 +68,7 @@ export async function referenceCodeblockProcessor(
 }
 
 export async function getReference(
-	codeblockLines: Array<string>,
+	codeblockLines: string[],
 	sourcePath: string,
 	plugin: CodeStylerPlugin
 ): Promise<Reference> {
@@ -231,11 +231,11 @@ function referencesByFileToCache(
 async function getFileReferences(
 	sourcePath: string,
 	plugin: CodeStylerPlugin
-): Promise<Array<Reference>> {
+): Promise<Reference[]> {
 	const fileContentLines = await getFileContentLines(sourcePath, plugin);
 	if (!fileContentLines) throw Error(`File could not be read: ${sourcePath}`);
 	const fileReference = [];
-	const sections: Array<SectionCache> =
+	const sections: SectionCache[] =
 		plugin.app.metadataCache.getCache(sourcePath)?.sections ?? [];
 	for (const section of sections) {
 		if (section.type !== "code") continue;

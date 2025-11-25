@@ -337,10 +337,10 @@ export function createCodeblockCodeMirrorExtensions(
 
 	function settingsChangeExtender() {
 		return EditorState.transactionExtender.of((transaction) => {
-			let addEffects: Array<StateEffect<unknown>> = [];
+			let addEffects: StateEffect<unknown>[] = [];
 			const initialSettings = transaction.startState.field(settingsState);
-			let readdFoldLanguages: Array<string> = [];
-			let removeFoldLanguages: Array<string> = [];
+			let readdFoldLanguages: string[] = [];
+			let removeFoldLanguages: string[] = [];
 			if (
 				initialSettings.processedCodeblocksWhitelist !==
 				settings.processedCodeblocksWhitelist
@@ -367,13 +367,13 @@ export function createCodeblockCodeMirrorExtensions(
 					setDifference(
 						currentExcludedCodeblocks,
 						initialExcludedCodeblocks
-					) as Array<string>
+					) as string[]
 				);
 				readdFoldLanguages = readdFoldLanguages.concat(
 					setDifference(
 						initialExcludedCodeblocks,
 						currentExcludedCodeblocks
-					) as Array<string>
+					) as string[]
 				);
 			}
 			if (
@@ -390,13 +390,13 @@ export function createCodeblockCodeMirrorExtensions(
 					setDifference(
 						currentExcludedLanguages,
 						initialExcludedLanguages
-					) as Array<string>
+					) as string[]
 				);
 				readdFoldLanguages = readdFoldLanguages.concat(
 					setDifference(
 						initialExcludedLanguages,
 						currentExcludedLanguages
-					) as Array<string>
+					) as string[]
 				);
 			}
 			if (removeFoldLanguages.length !== 0)
@@ -411,7 +411,7 @@ export function createCodeblockCodeMirrorExtensions(
 	function cursorFoldExtender() {
 		return EditorState.transactionExtender.of(
 			(transaction: Transaction) => {
-				const addEffects: Array<StateEffect<unknown>> = [];
+				const addEffects: StateEffect<unknown>[] = [];
 				const foldDecorationsState =
 					transaction.startState
 						.field(foldDecorations, false)
@@ -458,7 +458,7 @@ export function createCodeblockCodeMirrorExtensions(
 	}
 	function documentFoldExtender() {
 		return EditorState.transactionExtender.of((transaction) => {
-			let addEffects: Array<StateEffect<unknown>> = [];
+			let addEffects: StateEffect<unknown>[] = [];
 			transaction.effects
 				.filter((effect) => effect.is(foldAll))
 				.forEach((effect) => {
@@ -1109,9 +1109,9 @@ export function createCodeblockCodeMirrorExtensions(
 
 	function convertReaddFold(
 		transaction: Transaction,
-		readdLanguages: Array<string>
+		readdLanguages: string[]
 	) {
-		const addEffects: Array<StateEffect<unknown>> = [];
+		const addEffects: StateEffect<unknown>[] = [];
 		for (
 			let iter = (
 				transaction.state.field(headerDecorations, false) ??
@@ -1161,8 +1161,8 @@ export function createCodeblockCodeMirrorExtensions(
 	function documentFold(
 		state: EditorState,
 		toFold?: boolean
-	): Array<StateEffect<unknown>> {
-		const addEffects: Array<StateEffect<unknown>> = [];
+	): StateEffect<unknown>[] {
+		const addEffects: StateEffect<unknown>[] = [];
 		const reset = typeof toFold === "undefined";
 		for (
 			let iter = (
@@ -1227,7 +1227,7 @@ const unfold: StateEffectType<{ from: number; to: number }> =
 	StateEffect.define();
 const hideFold: StateEffectType<Range<Decoration>> = StateEffect.define();
 const unhideFold: StateEffectType<Range<Decoration>> = StateEffect.define();
-const removeFold: StateEffectType<Array<string>> = StateEffect.define();
+const removeFold: StateEffectType<string[]> = StateEffect.define();
 const foldAll: StateEffectType<{ toFold?: boolean }> = StateEffect.define();
 export const rerender: StateEffectType<{ pos: number }> = StateEffect.define();
 
@@ -1399,6 +1399,7 @@ function foldRegion({
 }): Range<Decoration> {
 	return foldDecoration(language).range(foldFrom, foldTo);
 }
+
 function unfoldRegion({
 	from: foldFrom,
 	to: foldTo,
@@ -1412,12 +1413,14 @@ function unfoldRegion({
 		filterTo: foldTo,
 	};
 }
-function removeFoldLanguages(languages: Array<string>) {
+
+function removeFoldLanguages(languages: string[]) {
 	return {
 		filter: (from: number, to: number, value: Decoration) =>
 			!languages.includes(value?.spec?.language),
 	};
 }
+
 function unhideFoldUpdate(range: Range<Decoration>) {
 	return {
 		filterFrom: range.from,
@@ -1450,9 +1453,11 @@ function isFileIgnored(state: EditorState): boolean {
 		);
 	return false;
 }
+
 function isSourceMode(state: EditorState): boolean {
 	return !state.field(editorLivePreviewField);
 }
-function setDifference(array1: Array<unknown>, array2: Array<unknown>) {
+
+function setDifference(array1: unknown[], array2: unknown[]) {
 	return array1.filter((element) => !array2.includes(element));
 }

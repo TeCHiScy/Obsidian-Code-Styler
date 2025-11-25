@@ -62,7 +62,7 @@ export async function readingViewCodeblockDecoratingPostProcessor(
 		Boolean(element.querySelector("div.slides > *"));
 	if (printing && !plugin.settings.decoratePrint) return;
 
-	const codeblockPreElements: Array<HTMLElement> =
+	const codeblockPreElements: HTMLElement[] =
 		await getCodeblockPreElements(element, specific, editingEmbeds);
 	if (codeblockPreElements.length === 0 && !(editingEmbeds && specific))
 		return;
@@ -173,9 +173,9 @@ export function destroyReadingModeElements(): void {
 				)
 					.reduce(
 						(
-							reconstructedCodeblockLines: Array<string>,
+							reconstructedCodeblockLines: string[],
 							codeblockLine: HTMLElement
-						): Array<string> => {
+						): string[] => {
 							const codeblockLineText =
 								codeblockLine.firstChild as HTMLElement;
 							if (codeblockLineText)
@@ -200,7 +200,7 @@ export function destroyReadingModeElements(): void {
 }
 
 export async function renderSpecificReadingSection(
-	codeblockPreElements: Array<HTMLElement>,
+	codeblockPreElements: HTMLElement[],
 	sourcePath: string,
 	codeblockSectionInfo: MarkdownSectionInformation,
 	plugin: CodeStylerPlugin
@@ -234,7 +234,7 @@ export async function renderSpecificReadingSection(
 }
 
 async function renderSettings(
-	codeblockPreElements: Array<HTMLElement>,
+	codeblockPreElements: HTMLElement[],
 	sourcePath: string,
 	plugin: CodeStylerPlugin
 ) {
@@ -255,14 +255,14 @@ async function renderSettings(
 }
 
 async function renderDocument(
-	codeblockPreElements: Array<HTMLElement>,
+	codeblockPreElements: HTMLElement[],
 	sourcePath: string,
 	cache: CachedMetadata | null,
 	editingEmbeds: boolean,
 	printing: boolean,
 	plugin: CodeStylerPlugin
 ) {
-	const codeblocksParameters: Array<CodeblockParameters> =
+	const codeblocksParameters: CodeblockParameters[] =
 		await getCodeblocksParameters(sourcePath, cache, plugin, editingEmbeds);
 	await remakeCodeblocks(
 		codeblockPreElements,
@@ -312,8 +312,8 @@ async function retriggerProcessor(
 }
 
 async function remakeCodeblocks(
-	codeblockPreElements: Array<HTMLElement>,
-	codeblocksParameters: Array<CodeblockParameters>,
+	codeblockPreElements: HTMLElement[],
+	codeblocksParameters: CodeblockParameters[],
 	sourcePath: string,
 	dynamic: boolean,
 	skipStyled: boolean,
@@ -446,8 +446,8 @@ async function getCodeblockPreElements(
 	element: HTMLElement,
 	specific: boolean,
 	editingEmbeds: boolean
-): Promise<Array<HTMLElement>> {
-	let codeblockPreElements: Array<HTMLElement>;
+): Promise<HTMLElement[]> {
+	let codeblockPreElements: HTMLElement[];
 	if (!editingEmbeds && !specific)
 		codeblockPreElements = Array.from(
 			element.querySelectorAll(
@@ -482,8 +482,8 @@ async function getCodeblocksParameters(
 	cache: CachedMetadata | null,
 	plugin: CodeStylerPlugin,
 	editingEmbeds: boolean
-): Promise<Array<CodeblockParameters>> {
-	let codeblocksParameters: Array<CodeblockParameters> = [];
+): Promise<CodeblockParameters[]> {
+	let codeblocksParameters: CodeblockParameters[] = [];
 	const fileContentLines = await getFileContentLines(sourcePath, plugin);
 
 	if (typeof cache?.sections !== "undefined") {
@@ -598,7 +598,7 @@ async function toggleFold(
 function getPreClasses(
 	codeblockParameters: CodeblockParameters,
 	dynamic: boolean
-): Array<string> {
+): string[] {
 	const preClassList = ["code-styler-pre"];
 	if (codeblockParameters.language)
 		preClassList.push(`language-${codeblockParameters.language}`);
@@ -653,7 +653,7 @@ function getCodeblockLines(
 	codeblockCodeElement: HTMLElement,
 	sourcePath: string,
 	plugin: CodeStylerPlugin
-): Array<string> {
+): string[] {
 	const htmlTree = fromHtml(
 		codeblockCodeElement.innerHTML.replace(/\n/g, "<br>"),
 		{ fragment: true }
@@ -684,9 +684,9 @@ function getCodeblockLines(
 		) {
 			node.children = node.children.reduce(
 				(
-					result: Array<ElementContent>,
+					result: ElementContent[],
 					child: ElementContent
-				): Array<ElementContent> => {
+				): ElementContent[] => {
 					if (child.type !== "text") result.push(child);
 					else
 						result = convertCommentLinks(
@@ -709,11 +709,11 @@ function getCodeblockLines(
 }
 
 function convertCommentLinks(
-	result: Array<ElementContent>,
+	result: ElementContent[],
 	commentText: string,
 	sourcePath: string,
 	plugin: CodeStylerPlugin
-): Array<ElementContent> {
+): ElementContent[] {
 	const linkMatches = [
 		...commentText.matchAll(
 			/(?:\[\[[^\]|\r\n]+?(?:\|[^\]|\r\n]+?)?\]\]|\[.*?\]\(.+\))/g
@@ -722,9 +722,9 @@ function convertCommentLinks(
 	const newChildren = linkMatches
 		.reduce(
 			(
-				result: Array<ElementContent>,
+				result: ElementContent[],
 				linkMatch: RegExpMatchArray
-			): Array<ElementContent> => {
+			): ElementContent[] => {
 				if (typeof linkMatch?.index === "undefined") return result;
 				const ending = commentText.slice(
 					linkMatch.index + linkMatch[0].length
